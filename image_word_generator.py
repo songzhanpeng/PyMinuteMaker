@@ -30,7 +30,7 @@ class ImageWordGenerator:
                  font_path_en: str = None,
                  font_path_cn: str = None,
                  theme: str = "standard",
-                 device_mode: str = "auto"):
+                 device_mode: str = "mobile"):
         """
         初始化图片单词生成器
         
@@ -183,7 +183,7 @@ class ImageWordGenerator:
         参数:
             font_path: 字体文件路径
             font_size: 字体大小
-            font_type: 字体类型，'en'为英文，'cn'为中文
+            font_type: 字体类型，'en'为英文，'cn'为中文，'phonetic'为音标
             
         返回:
             PIL字体对象
@@ -198,20 +198,42 @@ class ImageWordGenerator:
             
             if system == "Windows":
                 # Windows系统字体
-                if font_type == "en":
+                if font_type == "phonetic":
+                    # Windows下支持音标的字体
+                    font_paths = [
+                        "arial.ttf", "Arial Unicode MS", "segoeui.ttf", 
+                        "C:/Windows/Fonts/arial.ttf", "C:/Windows/Fonts/arialuni.ttf", 
+                        "C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/seguisym.ttf",
+                        "C:/Windows/Fonts/calibri.ttf", "C:/Windows/Fonts/cambria.ttc"
+                    ]
+                elif font_type == "en":
                     font_paths = ["arial.ttf", "calibri.ttf", "C:/Windows/Fonts/arial.ttf"]
                 else:  # cn
                     font_paths = ["simhei.ttf", "simsun.ttc", "C:/Windows/Fonts/simhei.ttf", "C:/Windows/Fonts/simsun.ttc"]
             elif system == "Darwin":  # macOS
                 # macOS系统字体
-                if font_type == "en":
-                    font_paths = ["/System/Library/Fonts/Helvetica.ttc", "/Library/Fonts/Arial.ttf"]
+                if font_type == "phonetic" or font_type == "en":
+                    # macOS下支持音标的字体
+                    font_paths = [
+                        "/System/Library/Fonts/Helvetica.ttc", 
+                        "/Library/Fonts/Arial Unicode.ttf",
+                        "/System/Library/Fonts/AppleSDGothicNeo.ttc",
+                        "/System/Library/Fonts/STHeiti Light.ttc",
+                        "/System/Library/Fonts/Supplemental/Courier New.ttf",
+                        "/Library/Fonts/Arial.ttf"
+                    ]
                 else:  # cn
                     font_paths = ["/System/Library/Fonts/PingFang.ttc", "/Library/Fonts/Arial Unicode.ttf"]
             else:  # Linux或其他
                 # Linux系统字体
-                if font_type == "en":
-                    font_paths = ["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/TTF/Arial.ttf"]
+                if font_type == "phonetic" or font_type == "en":
+                    # Linux下支持音标的字体
+                    font_paths = [
+                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                        "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+                        "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+                        "/usr/share/fonts/TTF/Arial.ttf"
+                    ]
                 else:  # cn
                     font_paths = ["/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf", "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"]
             
@@ -451,36 +473,51 @@ class ImageWordGenerator:
             # 计算文本尺寸
             en_text_width, en_text_height = self.get_text_size(en_text, self.font_en)
             
-            # 设置音标字体大小为英文字体大小的70%
+            # 设置音标字体大小为英文字体大小的70%，并使用专门的音标字体
             font_size_phonetic = int(self.font_size_en * 0.7)
-            font_phonetic = self._load_font(self.font_path_en, font_size_phonetic, "en")
+            font_phonetic = self._load_font(self.font_path_en, font_size_phonetic, "phonetic")
             phonetic_text_width, phonetic_text_height = 0, 0
             if phonetic_text:
-                phonetic_text_width, phonetic_text_height = self.get_text_size(phonetic_text, font_phonetic)
+                try:
+                    # 尝试使用支持音标的字体计算大小
+                    phonetic_text_width, phonetic_text_height = self.get_text_size(phonetic_text, font_phonetic)
+                except Exception as e:
+                    print(f"计算音标尺寸时出错: {e}，将使用估算值")
+                    # 如果无法计算音标尺寸，使用估算值
+                    phonetic_text_width = len(phonetic_text) * (font_size_phonetic // 2)
+                    phonetic_text_height = font_size_phonetic
             
             # 计算中文文本尺寸
             cn_text_width, cn_text_height = self.get_text_size(cn_text, self.font_cn)
             
+            # 定义不同元素之间的间距
+            spacing_en_to_phonetic = 40  # 英文到音标的间距
+            spacing_phonetic_to_cn = 50  # 音标到中文的间距
+            spacing_en_to_cn = 60  # 如果没有音标，英文到中文的间距
+            
             # 计算总文本高度
-            spacing = 20  # 文本间距
-            total_text_height = en_text_height + phonetic_text_height + cn_text_height + spacing * 2
-            if not phonetic_text:
-                total_text_height -= phonetic_text_height + spacing
+            if phonetic_text:
+                total_text_height = en_text_height + phonetic_text_height + cn_text_height + spacing_en_to_phonetic + spacing_phonetic_to_cn
+            else:
+                total_text_height = en_text_height + cn_text_height + spacing_en_to_cn
             
             # 计算文本位置 - 上中下布局
             text_y_start = (height - total_text_height) // 2
             en_text_x = (width - en_text_width) // 2
             en_text_y = text_y_start
             
-            current_y = en_text_y + en_text_height + spacing
-            
             # 音标位置（如果有）
             phonetic_text_x = 0
             phonetic_text_y = 0
+            current_y = en_text_y + en_text_height
+            
             if phonetic_text:
+                current_y += spacing_en_to_phonetic
                 phonetic_text_x = (width - phonetic_text_width) // 2
                 phonetic_text_y = current_y
-                current_y += phonetic_text_height + spacing
+                current_y += phonetic_text_height + spacing_phonetic_to_cn
+            else:
+                current_y += spacing_en_to_cn
             
             # 中文位置
             cn_text_x = (width - cn_text_width) // 2
@@ -488,7 +525,7 @@ class ImageWordGenerator:
             
             # 如果需要背景矩形
             if self.config["bg_opacity"] > 0:
-                padding = 40
+                padding = 50  # 增加内边距以适应更大的间距
                 bg_rect_width = max(en_text_width, phonetic_text_width, cn_text_width) + padding * 2
                 bg_rect_height = total_text_height + padding * 2
                 bg_rect_x = (width - bg_rect_width) // 2
@@ -550,7 +587,13 @@ class ImageWordGenerator:
             
             # 添加装饰元素（如果配置允许）
             if self.config["decoration"]:
-                self.add_decorative_elements(draw, width, height, en_text_y, cn_text_y)
+                # 将分隔线放在英文单词和音标或中文之间，根据是否有音标调整位置
+                if phonetic_text:
+                    self.add_decorative_elements(draw, width, height, en_text_y, phonetic_text_y)
+                else:
+                    # 如果没有音标，将分隔线放在英文和中文之间的中点
+                    middle_y = en_text_y + (cn_text_y - en_text_y) // 2 - 15
+                    self.add_decorative_elements(draw, width, height, en_text_y, middle_y)
             
             # 添加文本阴影效果（如果配置允许）
             shadow_offset = self.config["shadow_offset"]
@@ -575,7 +618,14 @@ class ImageWordGenerator:
             
             # 绘制音标文本（如果有）
             if phonetic_text:
-                draw.text((phonetic_text_x, phonetic_text_y), phonetic_text, font=font_phonetic, fill=self.config["text_color"])
+                try:
+                    draw.text((phonetic_text_x, phonetic_text_y), phonetic_text, font=font_phonetic, fill=self.config["text_color"])
+                except Exception as e:
+                    # 如果使用特殊音标字符失败，尝试使用基本字符
+                    print(f"绘制音标文本失败: {e}")
+                    # 尝试将特殊音标字符替换为基本ASCII字符
+                    simplified_phonetic = phonetic_text.encode('ascii', 'replace').decode('ascii')
+                    draw.text((phonetic_text_x, phonetic_text_y), simplified_phonetic, font=font_phonetic, fill=self.config["text_color"])
             
             # 绘制中文文本
             draw.text((cn_text_x, cn_text_y), cn_text, font=self.font_cn, fill=self.config["text_color"])

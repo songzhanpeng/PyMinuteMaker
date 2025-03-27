@@ -23,4 +23,5 @@ vacation,/veɪˈkeɪʃn/,假期
 water,/ˈwɔːtər/,水
 xylophone,/ˈzaɪləfoʊn/,木琴
 yellow,/ˈjeloʊ/,黄色
-zoo,/zuː/,动物园 
+zoo,/zuː/,动物园
+I have an apple. ,/aɪ hæv æn ˈæpl/,我有一个苹果
