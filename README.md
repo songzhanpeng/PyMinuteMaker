@@ -1,27 +1,70 @@
 # Python一分钟视频制造机
 
-一个简单易用的自动化工具，用于快速生成一分钟长度的视频内容。通过简单的命令行操作，将文本、图片和音乐组合成精美的短视频。
+一个简单易用的自动化工具，用于快速生成一分钟长度的视频内容。通过简单的命令行操作，将图片转换成精美的短视频。
+
+## 新功能
+
+- **指定图片张数**：现在可以指定使用多少张图片来生成视频，默认为6张
+- **海浪形状背景**：单词卡片现在支持海浪形状的背景样式，更有活力
 
 ## 功能特点
 
-- 自动将文本转换为语音旁白（支持中文）
 - 从图片集合创建幻灯片视频
-- 添加背景音乐和淡入淡出过渡效果
+- 支持指定使用的图片张数（默认6张）
+- 添加淡入淡出过渡效果
 - 智能调整内容以确保视频长度为一分钟
 - 支持多种图片格式（jpg、jpeg、png、gif）
-- **新功能**: 图片单词生成器 - 将英语单词和中文释义添加到背景图片中
+- **图片单词生成器**: 将英语单词和中文释义添加到背景图片中
   - 提供5种精美主题风格，满足不同场景需求
   - 支持4种设备模式，适配手机、平板和桌面显示
 
 ## 安装要求
 
-1. 克隆此仓库：
+1. 克隆此仓库
+2. 安装依赖库：`pip install -r requirements.txt`
 
 ## 使用说明
 
 ### 一分钟视频制造机
 
-一个简单易用的自动化工具，用于快速生成一分钟长度的视频内容。通过简单的命令行操作，将文本、图片和音乐组合成精美的短视频。
+一个简单易用的自动化工具，用于快速生成一分钟长度的视频内容。
+
+#### 基本用法
+
+```bash
+python one_minute_video_maker.py --images 图片文件夹路径
+```
+
+这将使用默认6张图片从指定文件夹生成一个一分钟的视频。
+
+#### 完整参数说明
+
+```bash
+python one_minute_video_maker.py --images 图片文件夹路径 [选项]
+```
+
+可用选项：
+- `--num-images N`：指定使用的图片数量，默认为6张
+- `--output 文件名.mp4`：指定输出视频文件名，默认为"一分钟视频.mp4"
+- `--duration 秒数`：指定视频时长，默认为60秒
+- `--cleanup`：生成视频后删除临时文件
+
+#### 示例
+
+1. 使用默认6张图片：
+```bash
+python one_minute_video_maker.py --images my_photos
+```
+
+2. 指定使用10张图片：
+```bash
+python one_minute_video_maker.py --images my_photos --num-images 10
+```
+
+3. 生成30秒视频，指定输出文件名：
+```bash
+python one_minute_video_maker.py --images my_photos --duration 30 --output short_video.mp4
+```
 
 ### 图片单词生成器
 
@@ -45,6 +88,13 @@
 3. **elegant** - 优雅风格：圆角渐变背景，精致分隔线，视觉效果更加精美
 4. **dark** - 暗黑风格：深色背景，适合夜间学习
 5. **minimal** - 极简风格：无背景，仅文字和阴影，保持背景图片的完整视觉效果
+
+#### 背景样式
+
+您可以选择两种不同的背景样式，为您的单词卡片增添视觉趣味：
+
+1. **rectangle** - 矩形背景：传统的矩形或圆角矩形背景
+2. **wave** - 海浪形状：顶部和底部采用波浪线条设计，为卡片增添活力和趣味
 
 #### 设备模式
 
@@ -74,14 +124,17 @@ python image_word_generator.py --images 背景图片文件夹 --words 单词列�
 - `--images`：背景图片文件夹路径（必填）
 - `--words`：单词列表文件路径，每行格式为"英文,中文"（必填）
 - `--output`：输出图片文件夹路径（默认为"output_images"）
-- `--font-size-en`：英文字体大小（默认为120）
-- `--font-size-cn`：中文字体大小（默认为90）
+- `--font-size-en`：英文字体大小（默认为60）
+- `--font-size-cn`：中文字体大小（默认为45）
+- `--font-size-phonetic`：音标字体大小（默认为英文字体大小的30%）
 - `--font-path-en`：英文字体文件路径（可选，默认使用系统字体）
 - `--font-path-cn`：中文字体文件路径（可选，默认使用系统字体）
 - `--theme`：主题风格（可选，默认为"standard"）
   - 可选值：standard, focus, elegant, dark, minimal
 - `--device`：设备模式（可选，默认为"auto"）
   - 可选值：auto, mobile, tablet, desktop
+- `--bg-style`：背景样式（可选，默认为"rectangle"）
+  - 可选值：rectangle, wave
 
 #### 字体说明
 
@@ -112,8 +165,14 @@ python image_word_generator.py --images background_images --words words.txt
 # 使用专注主题和手机模式
 python image_word_generator.py --images background_images --words words.txt --theme focus --device mobile
 
-# 自定义输出文件夹、字体大小、主题和设备模式
-python image_word_generator.py --images background_images --words words.txt --output vocabulary_cards --font-size-en 150 --font-size-cn 100 --theme elegant --device tablet
+# 使用海浪形状背景
+python image_word_generator.py --images background_images --words words.txt --bg-style wave
+
+# 自定义音标字体大小
+python image_word_generator.py --images background_images --words words.txt --font-size-phonetic 20
+
+# 自定义输出文件夹、字体大小、主题、设备模式和背景样式
+python image_word_generator.py --images background_images --words words.txt --output vocabulary_cards --font-size-en 60 --font-size-cn 45 --font-size-phonetic 24 --theme elegant --device tablet --bg-style wave
 ```
 
 这将生成一系列图片，每张图片包含一个英语单词和对应的中文释义，保存在vocabulary_cards文件夹中。

@@ -25,12 +25,14 @@ class ImageWordGenerator:
     def __init__(self, 
                  images_folder: str,
                  output_folder: str = "output_images",
-                 font_size_en: int = 120,
-                 font_size_cn: int = 90,
+                 font_size_en: int = 80,  # 进一步降低默认英文字体大小
+                 font_size_cn: int = 55,   # 进一步降低默认中文字体大小
+                 font_size_phonetic: int = None,
                  font_path_en: str = None,
                  font_path_cn: str = None,
                  theme: str = "standard",
-                 device_mode: str = "mobile"):
+                 device_mode: str = "mobile",
+                 bg_style: str = "rectangle"):  # 新增背景样式参数
         """
         初始化图片单词生成器
         
@@ -39,19 +41,23 @@ class ImageWordGenerator:
             output_folder: 输出图片文件夹路径
             font_size_en: 英文字体大小
             font_size_cn: 中文字体大小
+            font_size_phonetic: 音标字体大小，不指定则默认为英文字体大小的35%
             font_path_en: 英文字体路径，不指定则使用系统字体
             font_path_cn: 中文字体路径，不指定则使用系统字体
             theme: 主题风格，可选 "standard"(标准), "focus"(专注), "elegant"(优雅), "dark"(暗黑), "minimal"(极简)
             device_mode: 设备模式，可选 "auto"(自动), "mobile"(手机), "tablet"(平板), "desktop"(桌面)
+            bg_style: 背景样式，可选 "rectangle"(矩形), "wave"(海浪形状)
         """
         self.images_folder = images_folder
         self.output_folder = output_folder
         self.font_size_en = font_size_en
         self.font_size_cn = font_size_cn
+        self.font_size_phonetic = font_size_phonetic if font_size_phonetic is not None else int(font_size_en * 0.35)  # 更小的音标字体比例
         self.font_path_en = font_path_en
         self.font_path_cn = font_path_cn
         self.theme = theme
         self.device_mode = device_mode
+        self.bg_style = bg_style
         
         # 设备模式配置
         self.device_configs = {
@@ -91,6 +97,7 @@ class ImageWordGenerator:
         if device_mode != "auto" and "font_size_multiplier" in self.device_config:
             self.font_size_en = int(self.font_size_en * self.device_config["font_size_multiplier"])
             self.font_size_cn = int(self.font_size_cn * self.device_config["font_size_multiplier"])
+            self.font_size_phonetic = int(self.font_size_phonetic * self.device_config["font_size_multiplier"])
         
         # 主题配置
         self.theme_configs = {
@@ -390,6 +397,84 @@ class ImageWordGenerator:
         # 粘贴到原图
         img.paste(gradient, (x1, y1), gradient)
     
+    def draw_wave_background(self, img: Image, xy: Tuple, bg_color: Tuple, radius: int = 20) -> Image:
+        """
+        绘制海浪形状的背景
+        
+        参数:
+            img: 原始图像
+            xy: 坐标 (x1, y1, x2, y2)
+            bg_color: 背景颜色
+            radius: 波浪半径
+            
+        返回:
+            添加海浪背景的图像
+        """
+        x1, y1, x2, y2 = xy
+        width = x2 - x1
+        height = y2 - y1
+        
+        # 创建一个透明图层
+        overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(overlay)
+        
+        # 绘制主矩形背景
+        draw.rectangle([x1+radius, y1, x2-radius, y2], fill=bg_color)
+        draw.rectangle([x1, y1+radius, x2, y2-radius], fill=bg_color)
+        
+        # 绘制四个圆角
+        draw.pieslice([x1, y1, x1+radius*2, y1+radius*2], 180, 270, fill=bg_color)
+        draw.pieslice([x2-radius*2, y1, x2, y1+radius*2], 270, 360, fill=bg_color)
+        draw.pieslice([x1, y2-radius*2, x1+radius*2, y2], 90, 180, fill=bg_color)
+        draw.pieslice([x2-radius*2, y2-radius*2, x2, y2], 0, 90, fill=bg_color)
+        
+        # 添加波浪效果 - 顶部
+        wave_height = radius * 0.7
+        wave_width = width / 8  # 8个波
+        
+        # 绘制顶部波浪
+        for i in range(9):  # 9个点可以形成8个波
+            x_pos = x1 + i * wave_width
+            if i % 2 == 0:
+                y_pos = y1 - wave_height
+            else:
+                y_pos = y1
+            
+            if i == 0:
+                # 起始点
+                path = [(x_pos, y1)]
+            else:
+                # 添加控制点和目标点来创建贝塞尔曲线
+                control_x = x1 + (i - 0.5) * wave_width
+                control_y = y1 - wave_height if i % 2 == 1 else y1
+                path.append((control_x, control_y))
+                path.append((x_pos, y_pos))
+        
+        # 绘制底部波浪
+        for i in range(9):  # 9个点可以形成8个波
+            x_pos = x2 - i * wave_width
+            if i % 2 == 0:
+                y_pos = y2 + wave_height
+            else:
+                y_pos = y2
+            
+            # 添加控制点和目标点来创建贝塞尔曲线
+            if i > 0:
+                control_x = x2 - (i - 0.5) * wave_width
+                control_y = y2 + wave_height if i % 2 == 1 else y2
+                path.append((control_x, control_y))
+            path.append((x_pos, y_pos))
+        
+        # 完成路径
+        path.append((x1, y2))
+        path.append((x1, y1))
+        
+        # 填充路径
+        draw.polygon(path, fill=bg_color)
+        
+        # 合并图层
+        return Image.alpha_composite(img, overlay)
+    
     def add_decorative_elements(self, draw: ImageDraw, width: int, height: int, en_text_y: int, cn_text_y: int) -> None:
         """
         添加装饰元素
@@ -402,37 +487,19 @@ class ImageWordGenerator:
             cn_text_y: 中文文本Y坐标
         """
         # 在英文和中文之间添加分隔线
-        line_y = en_text_y + self.font_size_en + 10
-        line_width = min(width * 0.4, 200)  # 分隔线长度
+        line_y = (en_text_y + cn_text_y) // 2
+        line_width = min(width * 0.3, 150)  # 减小分隔线长度（原为0.4和200）
         line_x_start = (width - line_width) // 2
         line_x_end = line_x_start + line_width
         
-        # 绘制渐变分隔线
-        for i in range(5):
-            alpha = 150 - i * 30
+        # 绘制更细的渐变分隔线
+        for i in range(3):  # 减少分隔线厚度（原为5）
+            alpha = 130 - i * 40  # 降低透明度起始值（原为150）
             draw.line(
                 [(line_x_start, line_y+i), (line_x_end, line_y+i)],
                 fill=(255, 255, 255, alpha),
                 width=1
             )
-            
-        # 添加小点装饰
-        dot_radius = 3
-        dot_y = line_y + 8
-        
-        # 左侧小点
-        draw.ellipse(
-            [(line_x_start - 15 - dot_radius, dot_y - dot_radius), 
-             (line_x_start - 15 + dot_radius, dot_y + dot_radius)],
-            fill=(255, 255, 255, 180)
-        )
-        
-        # 右侧小点
-        draw.ellipse(
-            [(line_x_end + 15 - dot_radius, dot_y - dot_radius), 
-             (line_x_end + 15 + dot_radius, dot_y + dot_radius)],
-            fill=(255, 255, 255, 180)
-        )
     
     def add_text_to_image(self, image_path: str, en_text: str, phonetic_text: str, cn_text: str, output_path: str) -> Optional[str]:
         """
@@ -470,12 +537,51 @@ class ImageWordGenerator:
             # 创建绘图对象
             draw = ImageDraw.Draw(img)
             
-            # 计算文本尺寸
-            en_text_width, en_text_height = self.get_text_size(en_text, self.font_en)
+            # 动态调整字体大小 - 根据文本长度调整
+            adjusted_font_size_en = self.font_size_en
+            adjusted_font_size_cn = self.font_size_cn
+            adjusted_font_size_phonetic = self.font_size_phonetic
             
-            # 设置音标字体大小为英文字体大小的70%，并使用专门的音标字体
-            font_size_phonetic = int(self.font_size_en * 0.7)
-            font_phonetic = self._load_font(self.font_path_en, font_size_phonetic, "phonetic")
+            # 对长文本进行动态缩放
+            max_width = width * 0.75  # 文本最大宽度为图像宽度的75%，使整体布局更加舒适
+            
+            # 英文文本缩放 - 更激进的缩放策略
+            if len(en_text) > 10:  # 超过10个字符就开始缩放
+                scale_factor = min(1.0, 10 / len(en_text) * 1.3)  # 针对长文本缩放系数
+                adjusted_font_size_en = max(int(adjusted_font_size_en * scale_factor), 32)  # 降低最小字号为32
+            
+            # 中文文本缩放 - 更激进的缩放策略
+            if len(cn_text) > 5:  # 超过5个字符就开始缩放
+                scale_factor = min(1.0, 5 / len(cn_text) * 1.3)  # 针对长文本缩放系数
+                adjusted_font_size_cn = max(int(adjusted_font_size_cn * scale_factor), 28)  # 降低最小字号为28
+            
+            # 音标文本缩放 - 与英文文本成比例
+            if phonetic_text:
+                phonetic_scale = adjusted_font_size_en / self.font_size_en
+                adjusted_font_size_phonetic = max(int(self.font_size_phonetic * phonetic_scale), 15)  # 降低最小字号为15
+            
+            # 加载调整后的字体
+            font_en = self._load_font(self.font_path_en, adjusted_font_size_en, "en")
+            font_cn = self._load_font(self.font_path_cn, adjusted_font_size_cn, "cn")
+            font_phonetic = self._load_font(self.font_path_en, adjusted_font_size_phonetic, "phonetic")
+            
+            # 计算文本尺寸
+            en_text_width, en_text_height = self.get_text_size(en_text, font_en)
+            
+            # 确保文本不超过最大宽度
+            if en_text_width > max_width:
+                # 如果仍然超过最大宽度，继续减小字体大小
+                scale_factor = max_width / en_text_width
+                adjusted_font_size_en = max(int(adjusted_font_size_en * scale_factor), 28)
+                adjusted_font_size_phonetic = max(int(adjusted_font_size_phonetic * scale_factor), 12)
+                
+                # 重新加载调整后的字体
+                font_en = self._load_font(self.font_path_en, adjusted_font_size_en, "en")
+                font_phonetic = self._load_font(self.font_path_en, adjusted_font_size_phonetic, "phonetic")
+                
+                # 重新计算文本尺寸
+                en_text_width, en_text_height = self.get_text_size(en_text, font_en)
+            
             phonetic_text_width, phonetic_text_height = 0, 0
             if phonetic_text:
                 try:
@@ -484,16 +590,27 @@ class ImageWordGenerator:
                 except Exception as e:
                     print(f"计算音标尺寸时出错: {e}，将使用估算值")
                     # 如果无法计算音标尺寸，使用估算值
-                    phonetic_text_width = len(phonetic_text) * (font_size_phonetic // 2)
-                    phonetic_text_height = font_size_phonetic
+                    phonetic_text_width = len(phonetic_text) * (adjusted_font_size_phonetic // 2)
+                    phonetic_text_height = adjusted_font_size_phonetic
             
             # 计算中文文本尺寸
-            cn_text_width, cn_text_height = self.get_text_size(cn_text, self.font_cn)
+            cn_text_width, cn_text_height = self.get_text_size(cn_text, font_cn)
             
-            # 定义不同元素之间的间距
-            spacing_en_to_phonetic = 40  # 英文到音标的间距
-            spacing_phonetic_to_cn = 50  # 音标到中文的间距
-            spacing_en_to_cn = 60  # 如果没有音标，英文到中文的间距
+            # 如果中文文本超过最大宽度，继续减小字体大小
+            if cn_text_width > max_width:
+                scale_factor = max_width / cn_text_width
+                adjusted_font_size_cn = max(int(adjusted_font_size_cn * scale_factor), 22)
+                
+                # 重新加载调整后的字体
+                font_cn = self._load_font(self.font_path_cn, adjusted_font_size_cn, "cn")
+                
+                # 重新计算文本尺寸
+                cn_text_width, cn_text_height = self.get_text_size(cn_text, font_cn)
+            
+            # 进一步减小元素之间的间距，使整体更紧凑
+            spacing_en_to_phonetic = 18  # 英文到音标的间距（原为25）
+            spacing_phonetic_to_cn = 25  # 音标到中文的间距（原为35）
+            spacing_en_to_cn = 30  # 如果没有音标，英文到中文的间距（原为40）
             
             # 计算总文本高度
             if phonetic_text:
@@ -525,75 +642,83 @@ class ImageWordGenerator:
             
             # 如果需要背景矩形
             if self.config["bg_opacity"] > 0:
-                padding = 50  # 增加内边距以适应更大的间距
+                padding = 25  # 进一步减小内边距（原为30）
                 bg_rect_width = max(en_text_width, phonetic_text_width, cn_text_width) + padding * 2
                 bg_rect_height = total_text_height + padding * 2
                 bg_rect_x = (width - bg_rect_width) // 2
                 bg_rect_y = text_y_start - padding
                 
-                # 绘制背景（标准、圆角或渐变）
-                bg_color = self.config["bg_color"]
+                # 降低背景透明度，让背景不那么突兀
+                bg_color = list(self.config["bg_color"])
+                if bg_color[3] > 60:  # 如果原透明度大于60
+                    bg_color[3] = int(bg_color[3] * 0.8)  # 降低透明度到原来的80%
+                bg_color = tuple(bg_color)
                 
-                if self.config["rounded_bg"]:
-                    # 创建透明层
-                    overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
-                    overlay_draw = ImageDraw.Draw(overlay)
-                    
-                    if self.config["gradient_bg"]:
-                        # 渐变圆角背景
-                        top_color = (bg_color[0], bg_color[1], bg_color[2], bg_color[3])
-                        bottom_color = (bg_color[0], bg_color[1], bg_color[2], bg_color[3] // 2)
-                        self.draw_gradient_rectangle(
-                            overlay, 
-                            (bg_rect_x, bg_rect_y, bg_rect_x + bg_rect_width, bg_rect_y + bg_rect_height),
-                            top_color, bottom_color, radius=30
-                        )
-                    else:
-                        # 普通圆角背景
-                        self.draw_rounded_rectangle(
-                            overlay_draw,
-                            (bg_rect_x, bg_rect_y, bg_rect_x + bg_rect_width, bg_rect_y + bg_rect_height),
-                            radius=30,
-                            fill=bg_color
-                        )
-                    
-                    # 合并图层
-                    img = Image.alpha_composite(img, overlay)
+                # 创建透明层
+                overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
+                
+                # 根据背景样式选择不同的绘制方法
+                if self.bg_style == "wave":
+                    # 绘制海浪形状背景
+                    img = self.draw_wave_background(
+                        img, 
+                        (bg_rect_x, bg_rect_y, bg_rect_x + bg_rect_width, bg_rect_y + bg_rect_height),
+                        bg_color
+                    )
                     draw = ImageDraw.Draw(img)
                 else:
-                    # 普通矩形背景
-                    overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
+                    # 原有的矩形背景绘制方式
                     overlay_draw = ImageDraw.Draw(overlay)
                     
-                    if self.config["gradient_bg"]:
-                        # 渐变背景
-                        top_color = (bg_color[0], bg_color[1], bg_color[2], bg_color[3])
-                        bottom_color = (bg_color[0], bg_color[1], bg_color[2], bg_color[3] // 2)
-                        self.draw_gradient_rectangle(
-                            overlay, 
-                            (bg_rect_x, bg_rect_y, bg_rect_x + bg_rect_width, bg_rect_y + bg_rect_height),
-                            top_color, bottom_color
-                        )
+                    if self.config["rounded_bg"]:
+                        # 绘制圆角背景
+                        if self.config["gradient_bg"]:
+                            # 渐变圆角背景
+                            top_color = (bg_color[0], bg_color[1], bg_color[2], bg_color[3])
+                            bottom_color = (bg_color[0], bg_color[1], bg_color[2], bg_color[3] // 2)
+                            self.draw_gradient_rectangle(
+                                overlay, 
+                                (bg_rect_x, bg_rect_y, bg_rect_x + bg_rect_width, bg_rect_y + bg_rect_height),
+                                top_color, bottom_color, radius=20  # 减小圆角半径（原为30）
+                            )
+                        else:
+                            # 普通圆角背景
+                            self.draw_rounded_rectangle(
+                                overlay_draw,
+                                (bg_rect_x, bg_rect_y, bg_rect_x + bg_rect_width, bg_rect_y + bg_rect_height),
+                                radius=20,  # 减小圆角半径（原为30）
+                                fill=bg_color
+                            )
+                        
+                        # 合并图层
+                        img = Image.alpha_composite(img, overlay)
+                        draw = ImageDraw.Draw(img)
                     else:
-                        # 普通背景
-                        overlay_draw.rectangle(
-                            [bg_rect_x, bg_rect_y, bg_rect_x + bg_rect_width, bg_rect_y + bg_rect_height],
-                            fill=bg_color
-                        )
-                    
-                    # 合并图层
-                    img = Image.alpha_composite(img, overlay)
-                    draw = ImageDraw.Draw(img)
+                        # 普通矩形背景
+                        if self.config["gradient_bg"]:
+                            # 渐变背景
+                            top_color = (bg_color[0], bg_color[1], bg_color[2], bg_color[3])
+                            bottom_color = (bg_color[0], bg_color[1], bg_color[2], bg_color[3] // 2)
+                            self.draw_gradient_rectangle(
+                                overlay, 
+                                (bg_rect_x, bg_rect_y, bg_rect_x + bg_rect_width, bg_rect_y + bg_rect_height),
+                                top_color, bottom_color
+                            )
+                        else:
+                            # 普通背景
+                            overlay_draw.rectangle(
+                                [bg_rect_x, bg_rect_y, bg_rect_x + bg_rect_width, bg_rect_y + bg_rect_height],
+                                fill=bg_color
+                            )
+                        
+                        # 合并图层
+                        img = Image.alpha_composite(img, overlay)
+                        draw = ImageDraw.Draw(img)
             
             # 添加装饰元素（如果配置允许）
             if self.config["decoration"]:
-                # 将分隔线放在英文单词和音标或中文之间，根据是否有音标调整位置
-                if phonetic_text:
-                    self.add_decorative_elements(draw, width, height, en_text_y, phonetic_text_y)
-                else:
-                    # 如果没有音标，将分隔线放在英文和中文之间的中点
-                    middle_y = en_text_y + (cn_text_y - en_text_y) // 2 - 15
-                    self.add_decorative_elements(draw, width, height, en_text_y, middle_y)
+                # 缩小装饰线宽度
+                self.add_decorative_elements(draw, width, height, en_text_y, phonetic_text_y if phonetic_text else (cn_text_y - spacing_en_to_cn // 2))
             
             # 添加文本阴影效果（如果配置允许）
             shadow_offset = self.config["shadow_offset"]
@@ -602,7 +727,7 @@ class ImageWordGenerator:
             if shadow_offset > 0:
                 # 绘制英文文本阴影
                 draw.text((en_text_x + shadow_offset, en_text_y + shadow_offset), 
-                          en_text, font=self.font_en, fill=shadow_color)
+                          en_text, font=font_en, fill=shadow_color)
                 
                 # 绘制音标文本阴影（如果有）
                 if phonetic_text:
@@ -611,10 +736,10 @@ class ImageWordGenerator:
                 
                 # 绘制中文文本阴影
                 draw.text((cn_text_x + shadow_offset, cn_text_y + shadow_offset), 
-                          cn_text, font=self.font_cn, fill=shadow_color)
+                          cn_text, font=font_cn, fill=shadow_color)
             
             # 绘制英文文本
-            draw.text((en_text_x, en_text_y), en_text, font=self.font_en, fill=self.config["text_color"])
+            draw.text((en_text_x, en_text_y), en_text, font=font_en, fill=self.config["text_color"])
             
             # 绘制音标文本（如果有）
             if phonetic_text:
@@ -628,7 +753,7 @@ class ImageWordGenerator:
                     draw.text((phonetic_text_x, phonetic_text_y), simplified_phonetic, font=font_phonetic, fill=self.config["text_color"])
             
             # 绘制中文文本
-            draw.text((cn_text_x, cn_text_y), cn_text, font=self.font_cn, fill=self.config["text_color"])
+            draw.text((cn_text_x, cn_text_y), cn_text, font=font_cn, fill=self.config["text_color"])
             
             # 保存图片
             img = img.convert("RGB")  # 转换为RGB以保存为JPG
@@ -715,20 +840,21 @@ class ImageWordGenerator:
 
 def main():
     """主函数"""
-    parser = argparse.ArgumentParser(description="图片单词生成器")
+    parser = argparse.ArgumentParser(description="图片单词生成器 - 将英语单词和中文释义添加到背景图片中")
     parser.add_argument("--images", required=True, help="背景图片文件夹路径")
     parser.add_argument("--words", required=True, help="单词列表文件路径，每行格式为'英文,音标,中文'或'英文,中文'")
     parser.add_argument("--output", default="output_images", help="输出图片文件夹路径")
-    parser.add_argument("--font-size-en", type=int, default=120, help="英文字体大小")
-    parser.add_argument("--font-size-cn", type=int, default=90, help="中文字体大小")
-    parser.add_argument("--font-path-en", help="英文字体路径")
-    parser.add_argument("--font-path-cn", help="中文字体路径")
-    parser.add_argument("--theme", default="standard", 
-                       choices=["standard", "focus", "elegant", "dark", "minimal"],
-                       help="输出图片的主题风格: standard(标准), focus(专注), elegant(优雅), dark(暗黑), minimal(极简)")
-    parser.add_argument("--device", default="auto", 
-                       choices=["auto", "mobile", "tablet", "desktop"],
-                       help="设备模式: auto(自动), mobile(手机), tablet(平板), desktop(桌面)")
+    parser.add_argument("--font-size-en", type=int, default=80, help="英文字体大小，默认为80")
+    parser.add_argument("--font-size-cn", type=int, default=55, help="中文字体大小，默认为55")
+    parser.add_argument("--font-size-phonetic", type=int, default=None, help="音标字体大小，默认为英文字体大小的35%")
+    parser.add_argument("--font-path-en", help="英文字体文件路径")
+    parser.add_argument("--font-path-cn", help="中文字体文件路径")
+    parser.add_argument("--theme", default="standard", choices=["standard", "focus", "elegant", "dark", "minimal"], 
+                      help="主题风格: standard(标准), focus(专注), elegant(优雅), dark(暗黑), minimal(极简)")
+    parser.add_argument("--device", default="auto", choices=["auto", "mobile", "tablet", "desktop"],
+                      help="设备模式: auto(自动), mobile(手机), tablet(平板), desktop(桌面)")
+    parser.add_argument("--bg-style", default="rectangle", choices=["rectangle", "wave"],
+                      help="背景样式: rectangle(矩形), wave(海浪形状)")
     
     args = parser.parse_args()
     
@@ -738,19 +864,20 @@ def main():
         output_folder=args.output,
         font_size_en=args.font_size_en,
         font_size_cn=args.font_size_cn,
+        font_size_phonetic=args.font_size_phonetic,
         font_path_en=args.font_path_en,
         font_path_cn=args.font_path_cn,
         theme=args.theme,
-        device_mode=args.device
+        device_mode=args.device,
+        bg_style=args.bg_style
     )
     
     # 处理单词列表
     generator.process_word_list(args.words)
     
-    print(f"处理完成！输出图片保存在 {args.output} 文件夹中")
-    print(f"主题风格: {args.theme}")
-    print(f"设备模式: {args.device}")
+    print(f"处理完成，输出图片保存在 {args.output} 文件夹中")
+    return 0
 
 
 if __name__ == "__main__":
-    main() 
+    sys.exit(main()) 
